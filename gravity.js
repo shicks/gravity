@@ -1,3 +1,11 @@
+// TODO(sdh):
+//  - Store the eccentric anomaly from the last solve
+//    1. initial condition for next solve
+//    2. winning condition
+//  - Window blur/focus events
+//  - General stats - time, clock speed, fuel, etc
+//  - Buttons/swipe actions for mobile
+
 (function() {
 
   var svg = document.getElementById('svg');
