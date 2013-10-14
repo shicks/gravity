@@ -4,6 +4,7 @@
   bottom: 0;
   left: 0;
   right: 0;
+  background: black;
 }
 
 #stats {
@@ -23,4 +24,28 @@
   -webkit-border-radius: 4px;
   -moz-border-radius: 4px;
   border-radius: 4px; 
+}
+
+#planet {
+  fill: blue;
+}
+
+#target-orbit {
+  stroke: #a44;
+  stroke-width: 1px;
+  fill: none;
+}
+#current-orbit {
+  stroke: #4a4;
+  stroke-width: 1px;
+  fill: none;
+}
+#target-circle {
+  stroke: #f33;
+  stroke-width: 2px;
+  fill: none;
+}
+#current-ship {
+  stroke: #3f3;
+  fill: #3f3;
 }

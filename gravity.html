@@ -1,6 +1,20 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="gravity.css"/>
-<svg xmlns="http://www.w3.org/2000/svg" version="1.1" id="svg"></svg>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" id="svg">
+  <g id="starfield" transform="translate(0 0) scale(1)"></g>
+  <g id="view" transform="translate(0 0) scale(1) rotate(0) translate(0 0)">
+    <circle id="planet" cx="0" cy="0" r="10"/>
+    <ellipse id="target-orbit" transform="rotate(0)"
+             vector-effect="non-scaling-stroke"/>
+    <ellipse id="current-orbit" transform="rotate(0)"
+             vector-effect="non-scaling-stroke"/>
+    <circle id="target-circle" transform="translate(0 0) rotate(0)"
+            vector-effect="non-scaling-stroke"
+            cx="0" cy="0" r="2"/>
+    <path id="current-ship" transform="translate(0 0) rotate(0) scale(0.5 0.5)"
+          d="M -2 0 L -3 -2 L 3 0 L -3 2 Z"/>
+  </g>
+</svg>
 <div id="stats">
   Stats go here...
 </div>

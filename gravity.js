@@ -34,6 +34,17 @@
       y1 = f(x1);
     } while (y0 * y1 > 0);
     do {
+      // First do a normal bisection
+      xm = (x0 + x1) / 2;
+      ym = f(xm);
+      if (ym * y0 > 0) {
+        x0 = xm;
+        y0 = ym;
+      } else {
+        x1 = xm;
+        y1 = ym;
+      }
+      // Then do a weighted one
       xm = x0 - y0 / (y1 - y0) * (x1 - x0);
       ym = f(xm);
       if (ym * y0 > 0) {
@@ -68,9 +79,10 @@
   // orbital coordinates to pixel coordinates, fs transforms
   // relative distances, and t is the time.
   var view = (function() {
+    var group = document.getElementById('view');
     var objects = [];
     var control = {
-      redraw: function(t) {
+      redraw: function() {
         // determine the scale factor
         var sceneWidth = objects.reduce(function(v, o) {
           return Math.max(v, o.width());
@@ -83,14 +95,12 @@
         var scale = Math.min(docWidth / sceneWidth,
                              docHeight / sceneHeight);
         // only want discrete scales (rather than always zooming)
-        scale = Math.exp(Math.floor(Math.log(scale)));
-        // redraw everything
+        scale = Math.exp(Math.floor(Math.log(scale)) - 1);
+        // fix the group transform
         var cx = docWidth / 2;
         var cy = docHeight / 2;
-        var fx = function(x) { return x * scale + cx; };
-        var fy = function(y) { return y * scale + cy; };
-        var fs = function(s) { return s * scale; };
-        objects.forEach(function(o) { o.redraw(fx, fy, fs, t); });
+        group.transform.baseVal.getItem(0).setTranslate(cx, cy);
+        group.transform.baseVal.getItem(1).setScale(scale, scale);
       },
       add: function(obj) {
         objects.push(obj);
@@ -99,12 +109,11 @@
     return control;
   })();
 
-  var createOrbit = function(parent) {
+  var createOrbit = function(id, satId) {
     // SVG element
-    var orbit = createSvg('ellipse', parent);
-    orbit.style.stroke = '#aaa';
-    orbit.style.strokeWidth = 1; // dashed?
-    orbit.style.fill = 'none';
+    var orbit = document.getElementById(id);
+    var sat = document.getElementById(satId);
+    var satRadius = 2;
 
     // The orbit has three parameters
     var l = 0;  // angular momentum: l = r^2 \dot{theta}
@@ -118,102 +127,151 @@
     // current position.
     var T = 0;
 
+    // The current time and position.
+    var t = 0;
+    var x, y, vx, vy;
+    var angle = 0; // relative to "forward" (i.e. tangential)
+                   // TODO: expose different steering options
+
+    // Derived orbital parameters (for ellipse/hyperbola).
+    var a, b, cx, cy;
+
     var isEllipse = function() { return e < 1; };
     var asEllipse = function() { // assumes isEllipse
       // Semimajor axis a = l^2 / (1 - e^2)
       var a = l*l / (1 - e*e);
       // Semiminor axis b = a * sqrt(1 - e^2)
       var b = a * Math.sqrt(1 - e*e);
-      // Center (so that, after rotating theta0, 
-      var cx = -a * e * Math.cos(theta0);
-      var cy = -a * e * Math.sin(theta0);
+      // Center of the ellipse
       return {a: a, b: b, cx: cx, cy: cy};
+    };
+
+    var drawEllipse = function(x0, y0) {
+      // Recompute params
+      a = l*l / (1 - e*e);
+      b = a * Math.sqrt(1 - e*e);
+      var E = Math.atan2(y0 / b, x0 / a + e);
+      var time1 = a*Math.sqrt(a) * (E - e * Math.sin(E));
+      T = t - time1;
+      cx = -a * e * Math.cos(theta0);
+      cy = -a * e * Math.sin(theta0);
+      // Update element
+      orbit.cx.baseVal.value = cx;
+      orbit.cy.baseVal.value = cy;
+      orbit.rx.baseVal.value = a;
+      orbit.ry.baseVal.value = b;
+      orbit.transform.baseVal.getItem(0).
+          setRotate(theta0 * 180 / Math.PI, cx, cy);
+      orbit.style.display = 'inline';
+    };
+
+    var drawParabola = function(theta1) {
+      var D = Math.tan(theta1 / 2);
+      T = t - (l*l*l*D/2)*(1 + D*D/3);
+      orbit.style.display = 'none';
+      // TODO(sdh): approximate the conic by iterating over D
+    };
+
+    var drawHyperbola = function(x0, y0) {
+      a = l*l / (e*e - 1);
+      b = a * Math.sqrt(e*e - 1);
+      var E = atanh((y0 / b) / (e - x0 / a));
+      var time1 = a*Math.sqrt(a) * (E - e * Math.sin(E));
+      T = t - time1;
+      orbit.style.display = 'none';
+    };
+
+    var solveEllipse = function() {
+      var E = fsolve(
+          function(E) {
+            return a*Math.sqrt(a) * (E - e*Math.sin(E)) - (t - T);
+          }, function(E) {
+            return a*Math.sqrt(a) * (1 - e*Math.cos(E));
+          });
+      var Edot = 1 / (a*Math.sqrt(a) * (1 - e*Math.cos(E)));
+      x = a * (Math.cos(E) - e);
+      y = b * Math.sin(E);
+      vx = -a * Math.sin(E) * Edot;
+      vy = b * Math.cos(E) * Edot;
+    };
+
+    var solveHyperbola = function() {
+      var E = fsolve(
+          function(E) {
+            return a*Math.sqrt(a) * (e*sinh(E) - E) - (t - T);
+          }, function(E) {
+            return a*Math.sqrt(a) * (e*cosh(E) - 1);
+          });
+      var Edot = 1 / (a*Math.sqrt(a) * (e*cosh(E) - 1));
+      x = a * (e - cosh(E));
+      y = b * sinh(E);
+      vx = -a * sinh(E) * Edot;
+      vy = b * cosh(E) * Edot;
+    };
+
+    var solveParabola = function() {
+      // parabolas are weird (Barker's equation)
+      var D = fsolve(
+          function(D) {
+            return l*l*l/2 * (D + D*D*D/3) - (t - T);
+          }, function(D) {
+            return l*l*l/2 * (1 + D*D);
+          });
+      x = l*l / 2 * (1 - D*D);
+      y = l*l * D;
+      vy = 2 / (l * (1 + D*D));
+      vx = vy * D;
+    };
+
+    var rotateSolution = function() {
+      // Transform by the rotation theta0
+      var ct = Math.cos(theta0);
+      var st = Math.sin(theta0);
+      var r = {
+        x: x * ct - y * st,
+        y: y * ct + x * st,
+        vx: vx * ct - vy * st,
+        vy: vy * ct + vx * st
+      };
+      x = r.x; y = r.y; vx = r.vx; vy = r.vy;
+    };
+
+    var redrawSatellite = function() {
+      var forward = Math.atan2(vy, vx) * 180 / Math.PI + angle;
+      sat.transform.baseVal.getItem(0).setTranslate(x, y);
+      sat.transform.baseVal.getItem(1).setRotate(forward, 0, 0);
     };
 
     // Build the API
     var control = {
       width: function() {
-        return e < 1 ? 2 * l*l / (1 - e*e) : 200;
+        return (e < 1 ? (1+e)*a : control.radius()) + satRadius;
       },
       height: function() {
-        return e < 1 ? 2 * l*l / (1 - e*e) : 200;
+        return (e < 1 ? (1+e)*a : control.radius()) + satRadius;
       },
-      redraw: function(fx, fy, fs, t) {
-        if (!isEllipse()) {
-          orbit.style.display = 'none';
-          return;
-        }
-        orbit.style.display = 'inline';
-        var $ = asEllipse();
-        orbit.cx.baseVal.value = fx($.cx);
-        orbit.cy.baseVal.value = fy($.cy);
-        orbit.rx.baseVal.value = fs($.a);
-        orbit.ry.baseVal.value = fs($.b);
-        orbit.transform.baseVal.clear();
-        var transf = svg.createSVGTransform();
-        transf.setRotate(theta0 * 180 / Math.PI, fx($.cx), fy($.cy));
-        orbit.transform.baseVal.appendItem(transf);
+      radius: function() {
+        return Math.max(Math.abs(x), Math.abs(y));
+      },
+      position: function() {
+        return {x: x, y: y, vx: vx, vy: vy};
       },
       // Returns the position {x, y, vx, vy}.
-      position: function(t) {
+      advance: function(new_time) {
+        t = new_time;
         // First we need to compute the eccentric anomaly, E, which
         // requires a numerical solution to a transcendental equation.
-
-        // TODO(sdh): cache these until a reset
-        // then we can call position() with impunity...
-
-        var a, b, x, y, vx, vy, E, Edot; // note: not transformed by theta0 yet
         if (e < 1) {
-          a = l*l / (1 - e*e);
-          b = a * Math.sqrt(1 - e*e);
-          E = fsolve(
-              function(E) {
-                return a*Math.sqrt(a) * (E - e*Math.sin(E)) - (t - T);
-              }, function(E) {
-                return a*Math.sqrt(a) * (1 - e*Math.cos(E));
-              });
-          Edot = 1 / (a*Math.sqrt(a) * (1 - e*Math.cos(E)));
-          x = a * (Math.cos(E) - e);
-          y = b * Math.sin(E);
-          vx = -a * Math.sin(E) * Edot;
-          vy = b * Math.cos(E) * Edot;
+          solveEllipse();
         } else if (e > 1) {
-          a = l*l / (e*e - 1);
-          b = a * Math.sqrt(e*e - 1);
-          E = fsolve(
-              function(E) {
-                return a*Math.sqrt(a) * (e*sinh(E) - E) - (t - T);
-              }, function(E) {
-                return a*Math.sqrt(a) * (e*cosh(E) - 1);
-              });
-          Edot = 1 / (a*Math.sqrt(a) * (e*cosh(E) - 1));
-          x = a * (e - cosh(E));
-          y = b * sinh(E);
-          vx = -a * sinh(E) * Edot;
-          vy = b * cosh(E) * Edot;
-        } else { // e == 1, parabolas are weird (Barker's equation)
-          var D = fsolve(
-              function(D) {
-                return l*l*l/2 * (D + D*D*D/3) - (t - T);
-              }, function(D) {
-                return l*l*l/2 * (1 + D*D);
-              });
-          x = l*l / 2 * (1 - D*D);
-          y = l*l * D;
-          vy = 2 / (l * (1 + D*D));
-          vx = vy * D;
+          solveHyperbola();
+        } else { // e == 1
+          solveParabola();
         }
-        // Finally, transform by the rotation theta0 and return the result
-        var ct = Math.cos(theta0);
-        var st = Math.sin(theta0);
-        return {
-          x: x * ct - y * st,
-          y: y * ct + x * st,
-          vx: vx * ct - vy * st,
-          vy: vy * ct + vx * st
-        };
+        rotateSolution(); // rotates by theta0
+        redrawSatellite();
       },
-      reset: function(t, x, y, vx, vy) {
+      reset: function(x, y, vx, vy) {
         // First transform to radial coords.
         var r = Math.sqrt(x*x + y*y);
         if (r == 0) return; // crash - do nothing...
@@ -221,141 +279,88 @@
         var ct = x/r;
         var st = y/r;
         var vr = vx * ct + vy * st; // rotate by -theta
-        var vt = (vy * ct - vx * st) / r;
+        var vt = Math.abs(vy * ct - vx * st) / r;
         l = r*r*vt;
         var ey = l*vr;
         var ex = l*r*vt - 1;
         e = Math.sqrt(ex*ex + ey*ey);
         if (e == 0) {
           theta0 = theta;
-          T = t0;
+          //T = t0;
+          drawEllipse(0, 0);
           return;
         }
-        var theta1 = Math.atan2(ey, ex); // relative position (theta - theta0)
+        var theta1 = Math.atan2(ey, ex); // true anomaly (theta - theta0)
         theta0 = theta - theta1;
         if (e == 1) {
-          var D = Math.tan(theta1 / 2);
-          T = t - (l*l*l*D/2)*(1 + D*D/3);
+          drawParabola(theta1);
           return;
         }
-        var time1, E, a, b;
         var ct0 = Math.cos(theta0);
         var st0 = Math.sin(theta0);
         var x0 = x * ct0 + y * st0; // rotate by -theta0
         var y0 = y * ct0 - x * st0; // (x0, y0) is coords in aligned frame
         if (e < 1) {
-          a = l*l / (1 - e*e);
-          b = a * Math.sqrt(1 - e*e);
-          E = Math.atan2(y0 / b, x0 / a + e);
-          time1 = a*Math.sqrt(a) * (E - e * Math.sin(E));
+          drawEllipse(x0, y0);
         } else { // e > 1
-          a = l*l / (e*e - 1);
-          b = a * Math.sqrt(e*e - 1);
-          E = atanh((y0 / b) / (e - x0 / a));
-          time1 = a*Math.sqrt(a) * (E - e * Math.sin(E));
+          drawHyperbola(x0, y0);
         }
-        T = t - time1;
-      }
-    };
-    return control;
-  };
-
-  var createSatellite = function(orbit, parent, color) {
-    // SVG element
-    var circle = createSvg('circle', parent);
-    var line = createSvg('line', parent);
-    var radius = 3;
-    circle.style.fill = color;
-    line.style.stroke = 'black';
-    line.style.strokeWidth = 1;
-
-    var angle = 0; // relative to "forward" (i.e. tangential)
-
-    // Build the API
-    var control = {
-      width: function() {
-        // TODO: call position on the orbit, but we don't have a time...
-        return 0;
       },
-      height: function() {
-        return 0;
-      },
-      redraw: function(fx, fy, fs, t) {
-        var pos = orbit.position(t);
-        circle.cx.baseVal.value = fx(pos.x);
-        circle.cy.baseVal.value = fy(pos.y);
-        circle.r.baseVal.value = fs(radius);
-        var dir = Math.atan2(pos.vy, pos.vx) + angle * Math.PI / 180;
-        var dx = radius * Math.cos(dir);
-        var dy = radius * Math.sin(dir);
-        line.x1.baseVal.value = fx(pos.x - dx);
-        line.x2.baseVal.value = fx(pos.x);
-        line.y1.baseVal.value = fy(pos.y - dy);
-        line.y2.baseVal.value = fy(pos.y);
-      },
-      turn: function(angle_change, t) {
+      turn: function(angle_change) {
         angle += angle_change;
-        // TODO: redraw
       },
-      thrust: function(speed_change, t) {
-        var pos = orbit.position(t);
-        var dir = Math.atan2(pos.vy, pos.vx) + angle * Math.PI / 180;
-        orbit.reset(t, pos.x, pos.y, pos.vx + speed_change * Math.cos(dir),
-                                     pos.vy + speed_change * Math.sin(dir));
-        // TODO: redraw
+      thrust: function(speed_change, extra_angle) {
+        extra_angle = extra_angle || 0;
+        var dir = Math.atan2(vy, vx) +
+                  (angle + extra_angle) * Math.PI / 180;
+        control.reset(x, y, vx + speed_change * Math.cos(dir),
+                            vy + speed_change * Math.sin(dir));
       }
     };
     return control;
   };
 
   var planet = (function() {
-    var radius = 10;
-    var elem = createSvg('circle', svg);
-    elem.style.fill = 'blue';
-    elem.style.stroke = 'black';
-    elem.style.strokeWidth = 2;
-    var control = {
-      width: function() { return radius; },
-      height: function() { return radius; },
-      redraw: function(fx, fy, fs) {
-        elem.cx.baseVal.value = fx(0);
-        elem.cy.baseVal.value = fy(0);
-        elem.r.baseVal.value = fs(radius);
-      }
-    };
-    return control;
+    var elem = document.getElementById('planet');
+    return {
+      width: function() { return elem.r.baseVal.value; },
+      height: function() { return elem.r.baseVal.value; }
+    };      
   })();
-
-  var target = createOrbit(svg);
-  target.reset(0, 50, 0, 0, -0.15);
-
   view.add(planet);
-  view.add(target);
-  view.add(createSatellite(target, svg, 'red'));
 
-  var orbit = createOrbit(svg);
-  orbit.reset(0, 40, 0, 0, -0.15);
-  var self = createSatellite(orbit, svg, 'green');
-  view.add(orbit);
-  view.add(self);
+  var target = createOrbit('target-orbit', 'target-circle');
+  target.reset(50, 0, 0, -0.15);
+  view.add(target);
+
+  var ship = createOrbit('current-orbit', 'current-ship');
+  ship.reset(40, 0, 0, -0.15);
+  view.add(ship);
 
   var t = 0;
+  var speed = 0.3;
+  var realTime = new Date().getTime();
 
   document.body.onkeydown = function(e) {
-    if (e.keyCode == 37) { // left
-      self.turn(-10, t);
-    } else if (e.keyCode == 39) { // right
-      self.turn(10, t);
-    } else if (e.keyCode == 38) { // up
-      self.thrust(0.0025, t);
-    } else if (e.keyCode == 40) { // down
-      self.thrust(-0.0025, t);
+    if (e.keyCode == 37 || e.char == 'a' || e.char == 'A') { // left
+      ship.turn(-10);
+    } else if (e.keyCode == 39 || e.char == 'd' || e.char == 'D') { // right
+      ship.turn(10);
+    } else if (e.keyCode == 38 || e.char == 'w' || e.char == 'W') { // up
+      ship.thrust(0.0025);
+    } else if (e.keyCode == 40 || e.char == 's' || e.char == 'S') { // down
+      ship.thrust(-0.0025);
     }
   };
 
   var update = function() {
-    t += 5;
-    view.redraw(t);
+    var currentTime = new Date().getTime();
+    t += speed * (currentTime - realTime);
+    realTime = currentTime;
+    target.advance(t);
+    ship.advance(t);
+
+    view.redraw();
     setTimeout(update, 15);
   };
   update();
