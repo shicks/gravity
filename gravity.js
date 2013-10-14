@@ -104,6 +104,9 @@
         running = false;
         realTime = null;
       },
+      isRunning: function() {
+        return running;
+      },
       pause: function() {
         if (!running) control.start();
         else control.stop();
@@ -135,8 +138,25 @@
   var view = (function() {
     var group = document.getElementById('view');
     var objects = [];
+    var viewSize = 50;
+    var viewSubject = null;
     var control = {
       redraw: function() {
+        var docWidth = svg.offsetWidth;
+        var docHeight = svg.offsetHeight;
+        var cx = docWidth / 2;
+        var cy = docHeight / 2;
+        group.transform.baseVal.getItem(0).setTranslate(cx, cy);
+        if (viewSubject) {
+          var pos = viewSubject.position();
+          group.transform.baseVal.getItem(0).setTranslate(cx, cy);
+          group.transform.baseVal.getItem(1).setScale(scale, scale);
+          var scale = Math.min(docWidth / viewSize, docHeight / viewSize);
+          group.transform.baseVal.getItem(1).setScale(scale, scale);
+          group.transform.baseVal.getItem(2).setRotate(-90 - pos.angle, 0, 0);
+          group.transform.baseVal.getItem(3).setTranslate(-pos.x, -pos.y);
+          return;
+        }
         // determine the scale factor
         var sceneWidth = objects.reduce(function(v, o) {
           return Math.max(v, o.width());
@@ -144,17 +164,29 @@
         var sceneHeight = objects.reduce(function(v, o) {
           return Math.max(v, o.height());
         }, 0);
-        var docWidth = svg.offsetWidth;
-        var docHeight = svg.offsetHeight;
         var scale = Math.min(docWidth / sceneWidth,
                              docHeight / sceneHeight);
         // only want discrete scales (rather than always zooming)
         scale = Math.exp(Math.floor(2 * Math.log(scale)) / 2);
         // fix the group transform
-        var cx = docWidth / 2;
-        var cy = docHeight / 2;
-        group.transform.baseVal.getItem(0).setTranslate(cx, cy);
         group.transform.baseVal.getItem(1).setScale(scale, scale);
+        group.transform.baseVal.getItem(2).setRotate(0, 0, 0);
+        group.transform.baseVal.getItem(3).setTranslate(0, 0);
+      },
+      setSubject: function(subject) {
+        viewSubject = subject;
+      },
+      toggleSubject: function(subject) {
+        viewSubject = viewSubject ? null : subject;
+      },
+      zoomIn: function() {
+        viewSize /= 1.1;
+      },
+      zoomOut: function() {
+        viewSize *= 1.1;
+      },
+      zoomReset: function() {
+        viewSize = 50;
       },
       add: function(obj) {
         objects.push(obj);
@@ -308,7 +340,8 @@
         return Math.max(Math.abs(x), Math.abs(y));
       },
       position: function() {
-        return {x: x, y: y, vx: vx, vy: vy};
+        var currentAngle = Math.atan2(vy, vx)*180/Math.PI + angle;
+        return {x: x, y: y, vx: vx, vy: vy, angle: currentAngle};
       },
       // Returns the position {x, y, vx, vy}.
       advance: function(new_time) {
@@ -360,15 +393,31 @@
           drawHyperbola(x0, y0);
         }
       },
-      turn: function(angle_change) {
-        angle += angle_change;
+      turn: function(angleChange) {
+        angle += angleChange;
       },
-      thrust: function(speed_change, extra_angle) {
-        extra_angle = extra_angle || 0;
+      thrust: function(speedChange, extraAngle) {
+        extraAngle = extraAngle || 0;
         var dir = Math.atan2(vy, vx) +
-                  (angle + extra_angle) * Math.PI / 180;
-        control.reset(x, y, vx + speed_change * Math.cos(dir),
-                            vy + speed_change * Math.sin(dir));
+                  (angle + extraAngle) * Math.PI / 180;
+        control.reset(x, y, vx + speedChange * Math.cos(dir),
+                            vy + speedChange * Math.sin(dir));
+      },
+      random: function(maxEccentricity) {
+        if (!maxEccentricity || maxEccentricity < 0 || maxEccentricity > 1) {
+          maxEccentricity = 1;
+        }
+        do {
+          var r = Math.random() * 40 + 30;
+          var theta = Math.random() * 2 * Math.PI;
+          var vr = (Math.random() - 0.5) * 0.1;
+          var vtheta = (Math.random() - 1.5) * 0.2;
+          var x = r * Math.cos(theta);
+          var y = r * Math.sin(theta);
+          var vx = vr * Math.cos(theta) - vtheta * Math.sin(theta);
+          var vy = vr * Math.sin(theta) + vtheta * Math.cos(theta);
+          control.reset(x, y, vx, vy);
+        } while (e >= maxEccentricity);
       }
     };
     return control;
@@ -378,10 +427,61 @@
     var elem = document.getElementById('planet');
     return {
       width: function() { return elem.r.baseVal.value; },
-      height: function() { return elem.r.baseVal.value; }
+      height: function() { return elem.r.baseVal.value; },
+      position: function() { return {x:0, y:0, vx:0, vy:0, angle:0 }; }
     };      
   })();
   view.add(planet);
+
+  var starfield = (function() {
+    var elem = document.getElementById('starfield');
+    for (var i = 0; i < 100; i++) {
+      var star = createSvg('circle', elem);
+      star.style.fill = 'white';
+      star.cx.baseVal.value = (Math.random() * 200) - 100;
+      star.cy.baseVal.value = (Math.random() * 200) - 100;
+      star.r.baseVal.value = Math.random() * 0.25;
+    }
+  })();
+
+  var createVisibilityLine = function(a, b, id) {
+    var elem = document.getElementById(id);
+    elem.style.display = 'none';
+    var visible = false;
+    return {
+      toggleVisibility: function() {
+        visible = !visible;
+        elem.style.display = visible ? 'inline' : 'none';
+      },
+      redraw: function() {
+        var p1 = a.position();
+        var p2 = b.position();
+        elem.x1.baseVal.value = p1.x;
+        elem.y1.baseVal.value = p1.y;
+        elem.x2.baseVal.value = p2.x;
+        elem.y2.baseVal.value = p2.y;
+      }
+    };
+  };
+
+  var helpScreen = (function() {
+    var elem = document.getElementById('help');
+    var wasRunning = false;
+    return {
+      show: function() {
+        wasRunning = clock.isRunning();
+        clock.stop();
+        elem.style.display = 'block';
+      },
+      isVisible: function() {
+        return elem.style.display == 'block';
+      },
+      hide: function() {
+        elem.style.display = 'none';
+        if (wasRunning) clock.start();
+      }
+    };
+  })();
 
   var target = createOrbit('target-orbit', 'target-circle');
   target.reset(50, 0, 0, -0.15);
@@ -391,7 +491,14 @@
   ship.reset(40, 0, 0, -0.15);
   view.add(ship);
 
+  var targetLine = createVisibilityLine(target, ship, 'target-line');
+  var planetLine = createVisibilityLine(planet, ship, 'planet-line');
+
   document.body.onkeydown = function(e) {
+    if (helpScreen.isVisible()) {
+      if (e.keyCode == 27) helpScreen.hide(); // esc
+      return;
+    }
     var shift = e.shiftKey ? 0.10 : 1;
     if (e.keyCode == 37 || e.keyCode == 65) { // left (a)
       ship.turn(-10 * shift);
@@ -405,20 +512,39 @@
       ship.thrust(0.0025 * shift, 270);
     } else if (e.keyCode == 69) { // strafe right (e)
       ship.thrust(0.0025 * shift, 90);
-    } else if (e.keyCode == 187 && e.shiftKey) { // speed up (+)
-      clock.setSpeed(clock.getSpeed() * 1.1);
-    } else if (e.keyCode == 187) { // default speed (=)
-      clock.setSpeed(0.3);
-    } else if (e.keyCode == 189) { // speed down (-)
-      clock.setSpeed(clock.getSpeed() / 1.1);
+    } else if (e.keyCode == 187 && e.shiftKey) { // zoom in (+)
+      view.zoomIn();
+    } else if (e.keyCode == 187) { // reset zoom (=)
+      view.zoomReset();
+    } else if (e.keyCode == 189) { // zoom out (-)
+      view.zoomOut();
     } else if (e.keyCode == 32) { // space
       clock.pause();
+    } else if (e.keyCode == 219) { // slow down ([)
+      clock.setSpeed(clock.getSpeed() / 1.1);
+    } else if (e.keyCode == 220) { // reset speed (\)
+      clock.setSpeed(0.3);
+    } else if (e.keyCode == 221) { // speed up (])
+      clock.setSpeed(clock.getSpeed() * 1.1);
+    } else if (e.keyCode == 76) { // toggle visibility lines (l)
+      targetLine.toggleVisibility();
+      planetLine.toggleVisibility();
+    } else if (e.keyCode == 90) { // toggle focus (z)
+      view.toggleSubject(ship);
+    } else if (e.keyCode == 191 && e.shiftKey) { // display help (?)
+      helpScreen.show();
+    } else if (e.keyCode == 48) {
+      ship.random(e.shiftKey ? 0.4 : 1);
+    } else if (e.keyCode == 57) {
+      target.random(e.shiftKey ? 0.4 : 1);
     }
   };
 
   clock.addListener(ship.advance);
   clock.addListener(target.advance);
   clock.addListener(view.redraw);
+  clock.addListener(targetLine.redraw);
+  clock.addListener(planetLine.redraw);
   clock.start();
 })();
 

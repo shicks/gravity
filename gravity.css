@@ -43,9 +43,41 @@
 #target-circle {
   stroke: #f33;
   stroke-width: 2px;
-  fill: none;
+  fill: black;
 }
 #current-ship {
   stroke: #3f3;
   fill: #3f3;
+}
+#planet-line {
+  stroke-width: 1px;
+  stroke: blue;
+}
+#target-line {
+  stroke-width: 1px;
+  stroke: #f33;
+}
+#help {
+  display: none;
+  opacity: 0.8;
+  background: black;
+  position: fixed;
+  top: 40px;
+  left: 40px;
+  right: 40px;
+  bottom: 40px;
+  color: white;
+}
+.help-column {
+  display: inline-block;
+  width: 350px;
+}
+.key {
+  display: inline-block;
+  color: #ffb;
+  width: 80px;
+}
+.key span {
+  color: white;
+  padding: 0 2px;
 }

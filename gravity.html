@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="gravity.css"/>
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" id="svg">
-  <g id="starfield" transform="translate(0 0) scale(1)"></g>
   <g id="view" transform="translate(0 0) scale(1) rotate(0) translate(0 0)">
+    <g id="starfield" transform="translate(0 0) scale(1)"></g>
     <circle id="planet" cx="0" cy="0" r="10"/>
     <ellipse id="target-orbit" transform="rotate(0)"
              vector-effect="non-scaling-stroke"/>
     <ellipse id="current-orbit" transform="rotate(0)"
              vector-effect="non-scaling-stroke"/>
+    <line id="planet-line" vector-effect="non-scaling-stroke"/>
+    <line id="target-line" vector-effect="non-scaling-stroke"/>
     <circle id="target-circle" transform="translate(0 0) rotate(0)"
             vector-effect="non-scaling-stroke"
             cx="0" cy="0" r="2"/>
@@ -17,5 +19,71 @@
 </svg>
 <div id="stats">
   Stats go here...
+</div>
+<div id="help">
+  <b>GRAVITY</b> - <a href="//github.com/shicks/gravity">GitHub Project</a>
+  <br/>
+  <a href="//github.com/shicks">Stephen Hicks</a>
+  <br/><br/>
+  A simple orbital simulator.  The goal is to dock your vessel (green) with the target (red).  Controls are as follows:
+  <br/><br/>
+  <div class="help-column">
+    <div class="help-binding">
+      <span class="key">(Shift+)W</span><span class="action">(Small) Thrust Forward</span>
+    </div>
+    <div class="help-binding">
+      <span class="key">(Shift+)S</span><span class="action">(Small) Thrust Backward</span>
+    </div>
+    <div class="help-binding">
+      <span class="key">(Shift+)A</span><span class="action">(Small) Turn Left</span>
+    </div>
+    <div class="help-binding">
+      <span class="key">(Shift+)D</span><span class="action">(Small) Turn Right</span>
+    </div>
+    <div class="help-binding">
+      <span class="key">(Shift+)Q</span><span class="action">(Small) Thrust Left</span>
+    </div>
+    <div class="help-binding">
+      <span class="key">(Shift+)E</span><span class="action">(Small) Thrust Right</span>
+    </div>
+
+    <br/>
+    <div class="help-binding">
+      <span class="key">(Shift+)0</span><span class="action">Random Ship Position</span>
+    </div>
+    <div class="help-binding">
+      <span class="key">(Shift+)9</span><span class="action">Random Target Position</span>
+    </div>
+    <div class="help-binding">
+      <span class="key"></span><span class="action">(Shift = more circular)</span>
+    </div>
+  </div>
+
+  <div class="help-column">
+    <div class="help-binding">
+      <span class="key">[<span>/</span>]</span><span class="action">Speed Up/Down Clock</span>
+    </div>
+    <div class="help-binding">
+      <span class="key">=</span><span class="action">Reset Speed</span>
+    </div>
+    <div class="help-binding">
+      <span class="key">Space</span><span class="action">Pause</span>
+    </div>
+
+    <br/>
+    <div class="help-binding">
+      <span class="key">Z</span><span class="action">Toggle Planet/Ship View</span>
+    </div>
+    <div class="help-binding">
+      <span class="key">L</span><span class="action">Toggle Line Visibility</span>
+    </div>
+    <div class="help-binding">
+      <span class="key">+<span>/</span>-</span><span class="action">Zoom In/Out (Ship View only)</span>
+    </div>
+    <div class="help-binding">
+      <span class="key">=</span><span class="action">Reset Zoom</span>
+    </div>
+    
+  </div>
 </div>
 <script src="gravity.js"></script>
