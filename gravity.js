@@ -1,10 +1,8 @@
 // TODO(sdh):
-//  - Store the eccentric anomaly from the last solve
-//    1. initial condition for next solve
-//    2. winning condition
+//  - Use Elast for winning condition
 //  - Window blur/focus events
 //  - General stats - time, clock speed, fuel, framerate, etc
-//  - Buttons/swipe actions for mobile
+//  - Buttons, more swipe actions for mobile
 
 (function() {
 
@@ -17,7 +15,9 @@
   };
 
   // Returns the zero of the function (given its derivative)
-  var newtonRaphson = function(f, fprime, tol, x0) {
+  var newtonRaphson = function(f, fprime, tol, x0, iters) {
+    if (iters == null) iters = 10;
+    if (iters < 0) throw Error('Did not converge.');
     tol = tol || 1e-10;
     x0 = x0 || 0;
     if (isNaN(x0)) return x0;
@@ -26,18 +26,20 @@
     var yp0 = fprime(x0);
     var x1 = x0 - y0/yp0; // use successive over-relaxation
     //window.console.log('x=' + x0 + ', f(x)=' + y0 + ", f'(x)=" + yp0);
-    return newtonRaphson(f, fprime, tol, 0.2 * x0 + 0.8 * x1);
+    return newtonRaphson(f, fprime, tol, 0.2 * x0 + 0.8 * x1, iters - 1);
   };
 
   // Returns the zero of the function (ignores the derivative)
-  var binarySearch = function(f, _, tol) {
+  var binarySearch = function(f, _, tol, x0) {
     tol = tol || 1e-10;
-    var x0 = -1;
-    var x1 = 1;
+    var dx = 0.1;
+    var x1 = x0 + dx;
+    x0 = x0 - dx;
     var y0, y1, xm, ym;
     do { // bracket the root.
-      x0 *= 2;
-      x1 *= 2;
+      x0 -= dx;
+      x1 += dx;
+      dx *= 2;
       y0 = f(x0);
       y1 = f(x1);
     } while (y0 * y1 > 0);
@@ -66,7 +68,14 @@
     return xm;
   };
 
-  var fsolve = binarySearch;
+  var fsolve = function(f, fprime, tol, x0) {
+    if (fprime && x0 != null) {
+      try {
+        return newtonRaphson(f, fprime, tol, x0);
+      } catch (e) { /*ignore */ }
+    }
+    return binarySearch(f, fprime, tol, x0);
+  };
 
   var cosh = function(x) {
     return (Math.exp(x) + Math.exp(-x)) / 2;
@@ -223,7 +232,7 @@
 
     // The current time and position.
     var t = 0;
-    var x, y, vx, vy;
+    var x, y, vx, vy, Elast;
     var angle = 0; // relative to "forward" (i.e. tangential)
                    // TODO: expose different steering options
 
@@ -245,6 +254,7 @@
       a = l*l / (1 - e*e);
       b = a * Math.sqrt(1 - e*e);
       var E = Math.atan2(y0 / b, x0 / a + e);
+      Elast = E;
       var time1 = a*Math.sqrt(a) * (E - e * Math.sin(E));
       T = t - time1;
       cx = -a * e * Math.cos(theta0);
@@ -261,6 +271,7 @@
 
     var drawParabola = function(theta1) {
       var D = Math.tan(theta1 / 2);
+      Elast = null;
       T = t - (l*l*l*D/2)*(1 + D*D/3);
       orbit.style.display = 'none';
       // TODO(sdh): approximate the conic by iterating over D
@@ -270,6 +281,7 @@
       a = l*l / (e*e - 1);
       b = a * Math.sqrt(e*e - 1);
       var E = atanh((y0 / b) / (e - x0 / a));
+      Elast = E;
       var time1 = a*Math.sqrt(a) * (E - e * Math.sin(E));
       T = t - time1;
       orbit.style.display = 'none';
@@ -281,7 +293,8 @@
             return a*Math.sqrt(a) * (E - e*Math.sin(E)) - (t - T);
           }, function(E) {
             return a*Math.sqrt(a) * (1 - e*Math.cos(E));
-          });
+          }, null, Elast);
+      Elast = E;
       var Edot = 1 / (a*Math.sqrt(a) * (1 - e*Math.cos(E)));
       x = a * (Math.cos(E) - e);
       y = b * Math.sin(E);
@@ -295,7 +308,8 @@
             return a*Math.sqrt(a) * (e*sinh(E) - E) - (t - T);
           }, function(E) {
             return a*Math.sqrt(a) * (e*cosh(E) - 1);
-          });
+          }, null, Elast);
+      Elast = E;
       var Edot = 1 / (a*Math.sqrt(a) * (e*cosh(E) - 1));
       x = a * (e - cosh(E));
       y = b * sinh(E);
@@ -546,7 +560,8 @@
     };
   })();
 
-  document.body.onkeydown = function(e) {
+  // Install a keyboard listener
+  document.body.addEventListener('keydown', function(e) {
     if (helpScreen.isVisible()) {
       if (e.keyCode == 27) helpScreen.hide(); // esc
       return;
@@ -592,7 +607,21 @@
     } else if (e.keyCode == 88) { // toggle stats (x)
       stats.toggleVisibility();
     }
-  };
+  });
+
+  // Install swipe actions for mobile.
+  document.body.addEventListener('swipeLeft', function(e) {
+    ship.turn(-10);
+  });
+  document.body.addEventListener('swipeRight', function(e) {
+    ship.turn(10);
+  });
+  document.body.addEventListener('swipeUp', function(e) {
+    ship.thrust(0.0025 * shift);
+  });
+  document.body.addEventListener('swipeDown', function(e) {
+    ship.thrust(-0.0025 * shift);
+  });
 
   clock.addListener(ship.advance);
   clock.addListener(target.advance);
