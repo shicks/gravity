@@ -16,7 +16,7 @@
 
   // Returns the zero of the function (given its derivative)
   var newtonRaphson = function(f, fprime, tol, x0, iters) {
-    if (iters == null) iters = 10;
+    if (iters == null) iters = 30;
     if (iters < 0) throw Error('Did not converge.');
     tol = tol || 1e-10;
     x0 = x0 || 0;
