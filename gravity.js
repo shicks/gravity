@@ -72,6 +72,60 @@
     return 0.5 * Math.log((1 - x) / (1 + x));
   };
 
+  var clock = (function() {
+    var time = 0;
+    var speed = 0.3;
+    var realTime = null;
+    var running = false;
+    var listeners = [];
+    var delay = 18;
+
+    var iterate = function() {
+      if (!running || realTime == null) return;
+      running = false;
+      var nextRealTime = new Date().getTime();
+      time += speed * (nextRealTime - realTime);
+      realTime = nextRealTime;
+      listeners.forEach(function(listener) {
+        listener(time);
+      });
+      window.setTimeout(iterate, delay);
+      running = true;
+    };
+
+    var control = {
+      start: function() {
+        if (running) return;
+        running = true;
+        realTime = new Date().getTime();
+        window.setTimeout(iterate, delay);
+      },
+      stop: function() {
+        running = false;
+        realTime = null;
+      },
+      pause: function() {
+        if (!running) control.start();
+        else control.stop();
+      },
+      setSpeed: function(newSpeed) {
+        speed = newSpeed;
+      },
+      getSpeed: function() {
+        return speed;
+      },
+      getTime: function() {
+        return time;
+      },
+      addListener: function(listener) {
+        listeners.push(listener);
+      }
+    };
+
+    control.start();
+    return control;
+  })();
+
   // Used for keeping track of the objects on the canvas,
   // the size of the view window, and the orbital coordinates.
   // Objects must expose width(), height(), and redraw(fx, fy, fs, t)
@@ -95,7 +149,7 @@
         var scale = Math.min(docWidth / sceneWidth,
                              docHeight / sceneHeight);
         // only want discrete scales (rather than always zooming)
-        scale = Math.exp(Math.floor(Math.log(scale)) - 1);
+        scale = Math.exp(Math.floor(2 * Math.log(scale)) / 2);
         // fix the group transform
         var cx = docWidth / 2;
         var cy = docHeight / 2;
@@ -104,7 +158,7 @@
       },
       add: function(obj) {
         objects.push(obj);
-      }
+      }      
     };
     return control;
   })();
@@ -245,10 +299,10 @@
     // Build the API
     var control = {
       width: function() {
-        return (e < 1 ? (1+e)*a : control.radius()) + satRadius;
+        return (e < 1 ? 2*a : control.radius()) + satRadius;
       },
       height: function() {
-        return (e < 1 ? (1+e)*a : control.radius()) + satRadius;
+        return (e < 1 ? 2*a : control.radius()) + satRadius;
       },
       radius: function() {
         return Math.max(Math.abs(x), Math.abs(y));
@@ -337,33 +391,35 @@
   ship.reset(40, 0, 0, -0.15);
   view.add(ship);
 
-  var t = 0;
-  var speed = 0.3;
-  var realTime = new Date().getTime();
-
   document.body.onkeydown = function(e) {
-    if (e.keyCode == 37 || e.char == 'a' || e.char == 'A') { // left
-      ship.turn(-10);
-    } else if (e.keyCode == 39 || e.char == 'd' || e.char == 'D') { // right
-      ship.turn(10);
-    } else if (e.keyCode == 38 || e.char == 'w' || e.char == 'W') { // up
-      ship.thrust(0.0025);
-    } else if (e.keyCode == 40 || e.char == 's' || e.char == 'S') { // down
-      ship.thrust(-0.0025);
+    var shift = e.shiftKey ? 0.10 : 1;
+    if (e.keyCode == 37 || e.keyCode == 65) { // left (a)
+      ship.turn(-10 * shift);
+    } else if (e.keyCode == 39 || e.keyCode == 68) { // right (d)
+      ship.turn(10 * shift);
+    } else if (e.keyCode == 38 || e.keyCode == 87) { // up (w)
+      ship.thrust(0.0025 * shift);
+    } else if (e.keyCode == 40 || e.keyCode == 83) { // down (s)
+      ship.thrust(-0.0025 * shift);
+    } else if (e.keyCode == 81) { // strafe left (q)
+      ship.thrust(0.0025 * shift, 270);
+    } else if (e.keyCode == 69) { // strafe right (e)
+      ship.thrust(0.0025 * shift, 90);
+    } else if (e.keyCode == 187 && e.shiftKey) { // speed up (+)
+      clock.setSpeed(clock.getSpeed() * 1.1);
+    } else if (e.keyCode == 187) { // default speed (=)
+      clock.setSpeed(0.3);
+    } else if (e.keyCode == 189) { // speed down (-)
+      clock.setSpeed(clock.getSpeed() / 1.1);
+    } else if (e.keyCode == 32) { // space
+      clock.pause();
     }
   };
 
-  var update = function() {
-    var currentTime = new Date().getTime();
-    t += speed * (currentTime - realTime);
-    realTime = currentTime;
-    target.advance(t);
-    ship.advance(t);
-
-    view.redraw();
-    setTimeout(update, 15);
-  };
-  update();
+  clock.addListener(ship.advance);
+  clock.addListener(target.advance);
+  clock.addListener(view.redraw);
+  clock.start();
 })();
 
 /*
