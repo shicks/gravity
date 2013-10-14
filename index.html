@@ -18,7 +18,53 @@
   </g>
 </svg>
 <div id="stats">
-  Stats go here...
+  <div id="stats-ship">
+    <h2>Ship</h2>
+    <div class="stats-stat">
+      <span class="key">Altitude</span><span class="stats-value" data-key="r"></span>
+    </div>
+    <div class="stats-stat">
+      <span class="key">Speed</span><span class="stats-value" data-key="v"></span>
+    </div>
+    <div class="stats-stat">
+      <span class="key">Angular Momentum</span><span class="stats-value" data-key="l"></span>
+    </div>
+    <div class="stats-stat">
+      <span class="key">Eccentricity</span><span class="stats-value" data-key="e"></span>
+    </div>
+    <div class="stats-stat">
+      <span class="key">Argument of Periapsis</span><span
+            class="stats-value" data-key="theta0"></span>&deg;
+    </div>
+    <div class="stats-stat">
+      <span class="key">True Anomaly</span><span class="stats-value" data-key="theta"></span>&deg;
+    </div>
+    <div class="stats-stat">
+      <span class="key">Distance to Target</span><span class="stats-value" data-key="d"></span>
+    </div>
+  </div>
+  <div id="stats-target">
+    <h2>Target</h2>
+    <div class="stats-stat">
+      <span class="key">Altitude</span><span class="stats-value" data-key="r"></span>
+    </div>
+    <div class="stats-stat">
+      <span class="key">Speed</span><span class="stats-value" data-key="v"></span>
+    </div>
+    <div class="stats-stat">
+      <span class="key">Angular Momentum</span><span class="stats-value" data-key="l"></span>
+    </div>
+    <div class="stats-stat">
+      <span class="key">Eccentricity</span><span class="stats-value" data-key="e"></span>
+    </div>
+    <div class="stats-stat">
+      <span class="key">Argument of Periapsis</span><span
+            class="stats-value" data-key="theta0"></span>&deg;
+    </div>
+    <div class="stats-stat">
+      <span class="key">True Anomaly</span><span class="stats-value" data-key="theta"></span>&deg;
+    </div>
+  </div>
 </div>
 <div id="help">
   <b>GRAVITY</b> - <a href="//github.com/shicks/gravity">GitHub Project</a>
@@ -60,6 +106,14 @@
   </div>
 
   <div class="help-column">
+    <div class="help-binding">
+      <span class="key">?</span><span class="action">Display Help</span>
+    </div>
+    <div class="help-binding">
+      <span class="key">X</span><span class="action">Toggle Stats Visibility</span>
+    </div>
+
+    <br/>
     <div class="help-binding">
       <span class="key">[<span>/</span>]</span><span class="action">Speed Up/Down Clock</span>
     </div>

@@ -13,8 +13,8 @@
   position: fixed;
   bottom: 10px;
   right: 10px;
-  height: 100px;
-  width: 300px;
+  /* height: 100px; */
+  width: 230px;
   background: black;
   opacity: 0.75;
 
@@ -80,4 +80,10 @@
 .key span {
   color: white;
   padding: 0 2px;
+}
+
+#stats .key {
+  display: inline-block;
+  color: #ffb;
+  width: 150px;
 }

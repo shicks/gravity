@@ -372,7 +372,7 @@
         var ex = l*r*vt - 1;
         e = Math.sqrt(ex*ex + ey*ey);
         if (e == 0) {
-          theta0 = theta;
+          theta0 = 0;
           //T = t0;
           drawEllipse(0, 0);
           return;
@@ -418,6 +418,9 @@
           var vy = vr * Math.sin(theta) + vtheta * Math.cos(theta);
           control.reset(x, y, vx, vy);
         } while (e >= maxEccentricity);
+      },
+      stats: function() {
+        return {l: l, e: e, theta0: theta0, theta: Math.atan2(y, x) - theta0};
       }
     };
     return control;
@@ -494,6 +497,47 @@
   var targetLine = createVisibilityLine(target, ship, 'target-line');
   var planetLine = createVisibilityLine(planet, ship, 'planet-line');
 
+  var createStats = function(id, subject, target) {
+    var elem = document.getElementById(id);
+    return {
+      redraw: function() {
+        var stats = subject.stats();
+        stats.theta *= 180/Math.PI;
+        stats.theta0 *= 180/Math.PI;
+        if (stats.theta < 0) stats.theta += 360;
+        if (stats.theta0 < 0) stats.theta0 += 360;
+        var pos = subject.position();
+        stats.r = Math.sqrt(pos.x*pos.x + pos.y*pos.y);
+        stats.v = Math.sqrt(pos.vx*pos.vx + pos.vy*pos.vy);
+        if (target) {
+          var tpos = target.position();
+          stats.d = Math.sqrt((pos.x-tpos.x)*(pos.x-tpos.x) +
+                              (pos.y-tpos.y)*(pos.y-tpos.y));
+        }
+        var replacements = elem.getElementsByClassName('stats-value');
+        for (var i = 0; i < replacements.length; i++) {
+          replacements[i].innerHTML = stats[replacements[i].dataset['key']].toPrecision(3);
+        }
+      }
+    };
+  };
+
+  var stats = (function() {
+    var elem = document.getElementById('stats');
+    var shipStats = createStats('stats-ship', ship, target);
+    var targetStats = createStats('stats-target', target);
+
+    return {
+      redraw: function() {
+        shipStats.redraw();
+        targetStats.redraw();
+      },
+      toggleVisibility: function() {
+        elem.style.display = (elem.style.display == 'none') ? 'block' : 'none';
+      }
+    };
+  })();
+
   document.body.onkeydown = function(e) {
     if (helpScreen.isVisible()) {
       if (e.keyCode == 27) helpScreen.hide(); // esc
@@ -533,10 +577,12 @@
       view.toggleSubject(ship);
     } else if (e.keyCode == 191 && e.shiftKey) { // display help (?)
       helpScreen.show();
-    } else if (e.keyCode == 48) {
+    } else if (e.keyCode == 48) { // random ship position (0)
       ship.random(e.shiftKey ? 0.4 : 1);
-    } else if (e.keyCode == 57) {
+    } else if (e.keyCode == 57) { // random target position (9)
       target.random(e.shiftKey ? 0.4 : 1);
+    } else if (e.keyCode == 88) { // toggle stats (x)
+      stats.toggleVisibility();
     }
   };
 
@@ -545,6 +591,7 @@
   clock.addListener(view.redraw);
   clock.addListener(targetLine.redraw);
   clock.addListener(planetLine.redraw);
+  clock.addListener(stats.redraw);
   clock.start();
 })();
 
