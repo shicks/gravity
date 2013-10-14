@@ -3,7 +3,7 @@
 //    1. initial condition for next solve
 //    2. winning condition
 //  - Window blur/focus events
-//  - General stats - time, clock speed, fuel, etc
+//  - General stats - time, clock speed, fuel, framerate, etc
 //  - Buttons/swipe actions for mobile
 
 (function() {
