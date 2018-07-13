@@ -167,8 +167,8 @@
         if (viewSubject) {
           var pos = viewSubject.position();
           group.transform.baseVal.getItem(0).setTranslate(cx, cy);
-          group.transform.baseVal.getItem(1).setScale(scale, scale);
           var scale = Math.min(docWidth / viewSize, docHeight / viewSize);
+          group.transform.baseVal.getItem(1).setScale(scale, scale);
           group.transform.baseVal.getItem(1).setScale(scale, scale);
           group.transform.baseVal.getItem(2).setRotate(-90 - pos.angle, 0, 0);
           group.transform.baseVal.getItem(3).setTranslate(-pos.x, -pos.y);
