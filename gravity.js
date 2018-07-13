@@ -159,8 +159,8 @@
     var viewSubject = null;
     var control = {
       redraw: function() {
-        var docWidth = svg.offsetWidth;
-        var docHeight = svg.offsetHeight;
+        var docWidth = svg.offsetWidth || svg.clientWidth;
+        var docHeight = svg.offsetHeight || svg.clientHeight;
         var cx = docWidth / 2;
         var cy = docHeight / 2;
         group.transform.baseVal.getItem(0).setTranslate(cx, cy);
